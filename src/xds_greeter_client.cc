@@ -28,7 +28,7 @@
 #ifdef BAZEL_BUILD
 #include "examples/protos/helloworld.grpc.pb.h"
 #else
-#include "helloworld.grpc.pb.h"
+#include "../build/helloworld.grpc.pb.h"
 #endif
 
 ABSL_FLAG(std::string, target, "xds:///helloworld:50051", "Target string");

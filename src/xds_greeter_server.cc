@@ -33,7 +33,7 @@
 #ifdef BAZEL_BUILD
 #include "examples/protos/helloworld.grpc.pb.h"
 #else
-#include "helloworld.grpc.pb.h"
+#include "../build/helloworld.grpc.pb.h"
 #endif
 
 ABSL_FLAG(int32_t, port, 50051, "Server port for service.");
