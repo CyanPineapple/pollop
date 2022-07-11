@@ -19,27 +19,33 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
+#include <chrono>
 
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
 #include <grpcpp/grpcpp.h>
-#include <grpcpp/health_check_service_interface.h>
 
-#ifdef BAZEL_BUILD
-#include "examples/protos/helloworld.grpc.pb.h"
-#else
 #include "../build/simpleCalculation.grpc.pb.h"
-#endif
+#include "../build/healthCheck_hb.grpc.pb.h"
 
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::Status;
 using grpc::ServerCredentials;
+
 namespace pservice = pollop::service;
+namespace phealth = pollop::health;
+
 using pservice::simpleCalculation::SimCalc;
 using pservice::simpleCalculation::CalcRequest;
 using pservice::simpleCalculation::CalcReply;
 using pservice::simpleCalculation::opr;
+
+using phealth::hb::HeartBeat;
+using phealth::hb::HeartbeatRequest;
+using phealth::hb::HeartbeatResponse;
+
+typedef std::string service_name;
 
 class CalcServerImpl final: public SimCalc::Service {
 public:
@@ -63,19 +69,49 @@ public:
         return Status::OK;
     }
 };
+
+class HeartBeatImpl final: public HeartBeat::Service {
+public:
+
+   std::unordered_map<service_name , HeartbeatResponse::ServingStatus> health_table = {
+           {"", HeartbeatResponse::ServingStatus::HeartbeatResponse_ServingStatus_SERVING},
+           {"simpleCalculation", HeartbeatResponse::ServingStatus::HeartbeatResponse_ServingStatus_NOT_SERVING},
+   };
+
+    Status Check(ServerContext* context, const HeartbeatRequest* req, HeartbeatResponse* reply) override {
+        HeartbeatResponse::ServingStatus rep_status = req->service().empty() ? health_table[""] : health_table[req->service()];
+        reply->set_status(rep_status);
+        return Status::OK;
+    }
+    Status Watch(ServerContext* context, const HeartbeatRequest* req, grpc::ServerWriter<HeartbeatResponse>* writer) override {
+        HeartbeatResponse::ServingStatus rep_status = req->service().empty() ? health_table[""] : health_table[req->service()];
+        HeartbeatResponse resp;
+        resp.set_status(rep_status);
+       for (int i = 0; i < 5; i++) {
+           std::this_thread::sleep_for(std::chrono::seconds(1)) ;
+           writer->Write(resp);
+       }
+
+       return Status::OK;
+    }
+
+
+};
 // Logic and data behind the server's behavior.
 
 void RunServer() {
-    std::string server_string = "127.0.0.1:10001";
-    CalcServerImpl service;
+    std::string server_string = "localhost:10001";
+    CalcServerImpl calc_service;
+    HeartBeatImpl health_service;
     ServerBuilder builder;
     std::unique_ptr<Server> server = builder
             .AddListeningPort(server_string,grpc::InsecureServerCredentials())
-            .RegisterService(&service)
+            .RegisterService(&calc_service)
+            .RegisterService(&health_service)
             .BuildAndStart();
 
   // Finally assemble the server.
-  std::cout << "Server listening on " << server_string << std::endl;
+  std::cout << "Worker is on! Currently listening on " << server_string << std::endl;
   server->Wait();
 }
 

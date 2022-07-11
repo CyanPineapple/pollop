@@ -23,6 +23,7 @@
 #include <grpcpp/grpcpp.h>
 
 #include "../build/simpleCalculation.grpc.pb.h"
+#include "../build/healthCheck_hb.grpc.pb.h"
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -32,6 +33,11 @@ using pservice::simpleCalculation::SimCalc;
 using pservice::simpleCalculation::CalcRequest;
 using pservice::simpleCalculation::CalcReply;
 using pservice::simpleCalculation::opr;
+
+namespace phealth = pollop::health;
+using phealth::hb::HeartBeat;
+using phealth::hb::HeartbeatRequest;
+using phealth::hb::HeartbeatResponse;
 
 
 class CalClient {
@@ -51,90 +57,61 @@ public:
         if (status.ok()) return reply.result();
         else return -1;
     };
+
 private:
     std::unique_ptr<SimCalc::Stub> stub_ ;
 };
 
+class HealthClient {
+public:
+    HealthClient (std::shared_ptr<Channel> channel)
+    :  stub_(HeartBeat::NewStub(channel)) {};
 
-int main() {
-    std::string server_string = "127.0.0.1:10001";
+    int32_t heartbeat_check (std::string service_name) {
+        grpc::ClientContext context;
+        HeartbeatRequest request;
+        HeartbeatResponse res;
 
-    std::shared_ptr<Channel> channel = grpc::CreateChannel(server_string, grpc::InsecureChannelCredentials());
-    CalClient client(channel);
-    int32_t res = client.make_calculation(3,2, opr::MUL);
-    std::cout << "The result is: "<< res << std::endl;
-    return 0;
-}
-/***
-class GreeterClient {
- public:
-  GreeterClient(std::shared_ptr<Channel> channel)
-      : stub_(Greeter::NewStub(channel)) {}
+        request.set_service(service_name);
 
-  // Assembles the client's payload, sends it and presents the response back
-  // from the server.
-  std::string SayHello(const std::string& user) {
-    // Data we are sending to the server.
-    HelloRequest request;
-    request.set_name(user);
+        Status status = stub_->Check(&context, request, &res);
+        if (status.ok()) {
+            std::cout << "Heartbeat received: "<< res.status() << std::endl;
+            return 1;
+        }
+        else return -1;
+    };
 
-    // Container for the data we expect from the server.
-    HelloReply reply;
+    void heartbeat_watch (std::string service_name) {
+        grpc::ClientContext context;
+        HeartbeatRequest request;
+        request.set_service(service_name);
 
-    // Context for the client. It could be used to convey extra information to
-    // the server and/or tweak certain RPC behaviors.
-    ClientContext context;
-
-    // The actual RPC.
-    Status status = stub_->SayHello(&context, request, &reply);
-
-    // Act upon its status.
-    if (status.ok()) {
-      return reply.message();
-    } else {
-      std::cout << status.error_code() << ": " << status.error_message()
-                << std::endl;
-      return "RPC failed";
+        std::unique_ptr<grpc::ClientReader<HeartbeatResponse>> reader = stub_->Watch(&context,request);
+        HeartbeatResponse msg;
+        std::cout << "Start Watch Heartbeat!" << std::endl;
+        while (reader->Read(&msg)) {
+            std::cout << "HeartBeat: " << msg.status() << std::endl;
+        }
     }
-  }
 
- private:
-  std::unique_ptr<Greeter::Stub> stub_;
+private:
+   std::unique_ptr<HeartBeat::Stub> stub_ ;
 };
 
-int main(int argc, char** argv) {
-  // Instantiate the client. It requires a channel, out of which the actual RPCs
-  // are created. This channel models a connection to an endpoint specified by
-  // the argument "--target=" which is the only expected argument.
-  // We indicate that the channel isn't authenticated (use of
-  // InsecureChannelCredentials()).
-  std::string target_str;
-  std::string arg_str("--target");
-  if (argc > 1) {
-    std::string arg_val = argv[1];
-    size_t start_pos = arg_val.find(arg_str);
-    if (start_pos != std::string::npos) {
-      start_pos += arg_str.size();
-      if (arg_val[start_pos] == '=') {
-        target_str = arg_val.substr(start_pos + 1);
-      } else {
-        std::cout << "The only correct argument syntax is --target="
-                  << std::endl;
-        return 0;
-      }
-    } else {
-      std::cout << "The only acceptable argument is --target=" << std::endl;
-      return 0;
-    }
-  } else {
-    target_str = "localhost:50051";
-  }
-  GreeterClient greeter(
-      grpc::CreateChannel(target_str, grpc::InsecureChannelCredentials()));
-  std::string user("world");
-  std::string reply = greeter.SayHello(user);
-  std::cout << "Greeter received: " << reply << std::endl;
+int main() {
+    grpc::ChannelArguments args;
+    args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, 5000);
+    args.SetLoadBalancingPolicyName("round_robin");
+    std::shared_ptr<Channel> channel = grpc::CreateCustomChannel("dns:localhost:10001",grpc::InsecureChannelCredentials(),args);
+    //std::shared_ptr<Channel> channel = grpc::CreateChannel("127.0.0.1:10002",grpc::InsecureChannelCredentials());
 
-  return 0;
+    HealthClient health_client(channel);
+    CalClient cal_client(channel);
+
+    health_client.heartbeat_watch("simpleCalculation");
+    //int32_t resul = cal_client.make_calculation(2,3,opr::ADD);
+    //std::cout << resul << std::endl;
+
+    return 0;
 }
-***/

@@ -24,15 +24,17 @@ project(HelloWorld C CXX)
 include(./common.cmake)
 
 # Proto file
-
-get_filename_component(hw_proto "./protos/simpleCalculation.proto" ABSOLUTE)
+foreach (_proto
+        simpleCalculation
+        healthCheck_hb)
+get_filename_component(hw_proto "./protos/${_proto}.proto" ABSOLUTE)
 get_filename_component(hw_proto_path "${hw_proto}" PATH)
 
 # Generated sources
-set(hw_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/simpleCalculation.pb.cc")
-set(hw_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/simpleCalculation.pb.h")
-set(hw_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/simpleCalculation.grpc.pb.cc")
-set(hw_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/simpleCalculation.grpc.pb.h")
+set(hw_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/${_proto}.pb.cc")
+set(hw_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/${_proto}.pb.h")
+set(hw_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/${_proto}.grpc.pb.cc")
+set(hw_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/${_proto}.grpc.pb.h")
 add_custom_command(
       OUTPUT "${hw_proto_srcs}" "${hw_proto_hdrs}" "${hw_grpc_srcs}" "${hw_grpc_hdrs}"
       COMMAND ${_PROTOBUF_PROTOC}
@@ -47,24 +49,25 @@ add_custom_command(
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 
 # hw_grpc_proto
-add_library(hw_grpc_proto
+add_library(hw_grpc_proto_${_proto}
   ${hw_grpc_srcs}
   ${hw_grpc_hdrs}
   ${hw_proto_srcs}
   ${hw_proto_hdrs})
-target_link_libraries(hw_grpc_proto
+target_link_libraries(hw_grpc_proto_${_proto}
   ${_REFLECTION}
   ${_GRPC_GRPCPP}
   ${_PROTOBUF_LIBPROTOBUF})
+endforeach()
 
 # Targets greeter_[async_](client|server)
-foreach(_target
-        calculator_client
-        calculator_server
-    )
-  add_executable(${_target} "./src/${_target}.cc")
-  target_link_libraries(${_target}
-    hw_grpc_proto
+file(GLOB src_files "./src/*.cc")
+foreach(_target ${src_files})
+  get_filename_component(tar ${_target} NAME_WE)
+  add_executable(${tar} ${_target})
+  target_link_libraries(${tar}
+          hw_grpc_proto_simpleCalculation
+          hw_grpc_proto_healthCheck_hb
     ${_REFLECTION}
     ${_GRPC_GRPCPP}
     ${_PROTOBUF_LIBPROTOBUF})
