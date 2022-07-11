@@ -19,7 +19,7 @@ option java_package = "io.grpc.examples.simpleCalculation";
 option java_outer_classname = "simpleCalculationProto";
 option objc_class_prefix = "HLW";
 
-package simpleCalculation;
+package pollop.service.simpleCalculation;
 
 // The greeting service definition.
 service SimCalc {
@@ -37,7 +37,7 @@ enum opr {
 message CalcRequest {
   int32 first = 1;
   int32 second = 2;
-  opr operator = 3;
+  opr opera = 3;
 }
 
 // The response message containing the greetings

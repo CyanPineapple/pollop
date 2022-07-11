@@ -27,10 +27,11 @@
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
-using simpleCalculation::SimCalc;
-using simpleCalculation::CalcRequest;
-using simpleCalculation::CalcReply;
-using simpleCalculation::opr;
+namespace pservice = pollop::service;
+using pservice::simpleCalculation::SimCalc;
+using pservice::simpleCalculation::CalcRequest;
+using pservice::simpleCalculation::CalcReply;
+using pservice::simpleCalculation::opr;
 
 
 class CalClient {
@@ -44,7 +45,7 @@ public:
         CalcReply reply;
 
         request.set_first(first);
-        request.set_operator_(operand);
+        request.set_opera(operand);
         request.set_second(second);
         Status status = stub_->DoCalc(&context,request, &reply);
         if (status.ok()) return reply.result();
@@ -60,7 +61,7 @@ int main() {
 
     std::shared_ptr<Channel> channel = grpc::CreateChannel(server_string, grpc::InsecureChannelCredentials());
     CalClient client(channel);
-    int32_t res = client.make_calculation(3,2, opr::ADD);
+    int32_t res = client.make_calculation(3,2, opr::MUL);
     std::cout << "The result is: "<< res << std::endl;
     return 0;
 }

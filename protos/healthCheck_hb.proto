@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package pollop.health.hb;
+
+message HeartbeatRequest {
+  string service = 1;
+}
+
+message HeartbeatResponse {
+  enum Serving Status {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;
+  }
+
+  ServingStatus status = 1;
+}
+
+service HeartBeat {
+  rpc Check(HeartbeatRequest) returns (HeartbeatResponse);
+
+  rpc Watch(HeartbeatRequest) returns (stream HeartbeatResponse);
+}

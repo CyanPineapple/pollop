@@ -35,16 +35,30 @@ using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::Status;
 using grpc::ServerCredentials;
-using simpleCalculation::SimCalc;
-using simpleCalculation::CalcRequest;
-using simpleCalculation::CalcReply;
-using simpleCalculation::opr;
+namespace pservice = pollop::service;
+using pservice::simpleCalculation::SimCalc;
+using pservice::simpleCalculation::CalcRequest;
+using pservice::simpleCalculation::CalcReply;
+using pservice::simpleCalculation::opr;
 
 class CalcServerImpl final: public SimCalc::Service {
 public:
     Status DoCalc(ServerContext* context, const CalcRequest* req, CalcReply* reply) override {
         int32_t result;
-        result = req->first() + req->second();
+		switch (req->opera()) {
+			case 0:
+				result = req->first() + req->second();
+				break;
+			case 1:
+				result = req->first() - req->second();
+				break;
+			case 2:
+				result = req->first() * req->second();
+				break;
+			case 3:
+				result = req->first() / req->second();
+				break;
+		}
         reply->set_result(result);
         return Status::OK;
     }
